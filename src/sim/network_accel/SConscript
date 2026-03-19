@@ -1,0 +1,6 @@
+# -*- mode:python -*-
+
+Import('*')
+
+Source('WorkerPool.cc')
+Source('NetworkAccelCoordinator.cc')

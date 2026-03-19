@@ -130,12 +130,16 @@ class PySource(SourceFile):
             'PYSOURCE': File(source),
             'MARSHAL_PY': build_tools.File('marshal.py')
         }
-        gem5py_env.Command(cpp,
+        gem5py_env.Command(
+            cpp,
             [ '${PYSOURCE}', '${GEM5PY}', '${MARSHAL_PY}' ],
-            MakeAction('"${GEM5PY}" "${MARSHAL_PY}" "${TARGET}" ' \
-                       '"${PYSOURCE}" "${PYSOURCE_MODPATH}" ' \
-                       '"${PYSOURCE_ABSPATH}"',
-                       Transform("EMBED PY", max_sources=1)),
+            [
+                Mkdir(os.path.dirname(cpp)),
+                MakeAction('"${GEM5PY}" "${MARSHAL_PY}" "${TARGET}" ' \
+                           '"${PYSOURCE}" "${PYSOURCE_MODPATH}" ' \
+                           '"${PYSOURCE_ABSPATH}"',
+                           Transform("EMBED PY", max_sources=1)),
+            ],
             **overrides)
         Source(cpp, tags=self.tags, add_tags=['python', 'm5_module'])
 

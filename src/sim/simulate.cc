@@ -53,6 +53,7 @@
 #include "sim/async.hh"
 #include "sim/eventq.hh"
 #include "sim/init_signals.hh"
+#include "sim/network_accel/NetworkAccelCoordinator.hh"
 #include "sim/sim_events.hh"
 #include "sim/sim_exit.hh"
 #include "sim/stat_control.hh"
@@ -234,6 +235,7 @@ simulate(Tick num_cycles)
         inParallelMode = true;
     }
 
+    NetworkAccelCoordinator::instance().beforeSimulation();
     simulatorThreads->runUntilLocalExit();
     Event *local_event = doSimLoop(mainEventQueue[0]);
     assert(local_event);
@@ -251,6 +253,7 @@ simulate(Tick num_cycles)
         dynamic_cast<GlobalSimLoopExitEvent *>(global_event);
     assert(global_exit_event);
 
+    NetworkAccelCoordinator::instance().afterSimulation();
     return global_exit_event;
 }
 
@@ -297,6 +300,8 @@ doSimLoop(EventQueue *eventq)
     eventq->handleAsyncInsertions();
 
     bool mainQueue = eventq == getEventQueue(0);
+    auto &networkAccel = NetworkAccelCoordinator::instance();
+    networkAccel.onLoopEnter(eventq, mainQueue);
 
     while (1) {
         // there should always be at least one event (the SimLoopExitEvent
@@ -336,7 +341,33 @@ doSimLoop(EventQueue *eventq)
             }
         }
 
+        if (networkAccel.serialBatchingEnabled()) {
+            const Tick batchTick = eventq->nextTick();
+            const uint32_t batchLimit = networkAccel.dispatchBatchLimit();
+
+            for (uint32_t dispatched = 0; dispatched < batchLimit;
+                 ++dispatched) {
+                if (eventq->empty() || eventq->nextTick() != batchTick) {
+                    break;
+                }
+
+                networkAccel.beforeDispatch(eventq);
+                Event *exit_event = eventq->serviceOne();
+                networkAccel.afterDispatch(eventq, exit_event);
+                if (exit_event != NULL) {
+                    return exit_event;
+                }
+
+                if (mainQueue && async_event) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        networkAccel.beforeDispatch(eventq);
         Event *exit_event = eventq->serviceOne();
+        networkAccel.afterDispatch(eventq, exit_event);
         if (exit_event != NULL) {
             return exit_event;
         }

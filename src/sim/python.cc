@@ -27,6 +27,7 @@
 
 #include "pybind11/pybind11.h"
 #include "sim/init.hh"
+#include "sim/network_accel/NetworkAccelCoordinator.hh"
 #include "sim/port.hh"
 
 namespace gem5
@@ -44,6 +45,74 @@ sim_pybind(pybind11::module_ &m_internal)
         .def("bind", &Port::bind)
         .def("name", &Port::name)
         ;
+    m.def(
+        "configure_network_accel",
+        [](const std::string &mode, uint32_t workers) {
+            NetworkAccelCoordinator::instance().configure(mode, workers);
+        }
+    );
+    m.def(
+        "reset_network_accel",
+        []() {
+            NetworkAccelCoordinator::instance().reset();
+        }
+    );
+    m.def(
+        "get_network_accel_mode",
+        []() {
+            return NetworkAccelCoordinator::instance().modeName();
+        }
+    );
+    m.def(
+        "get_network_accel_workers",
+        []() {
+            return NetworkAccelCoordinator::instance().workers();
+        }
+    );
+    m.def(
+        "activate_parallel_network_accel",
+        [](uint32_t partitions) {
+            NetworkAccelCoordinator::instance().activateParallelMode(
+                partitions
+            );
+        }
+    );
+    m.def(
+        "get_network_accel_requested_mode",
+        []() {
+            return NetworkAccelCoordinator::instance().requestedModeName();
+        }
+    );
+    m.def(
+        "get_network_accel_requested_workers",
+        []() {
+            return NetworkAccelCoordinator::instance().requestedWorkers();
+        }
+    );
+    m.def(
+        "network_accel_downgraded",
+        []() {
+            return NetworkAccelCoordinator::instance().downgraded();
+        }
+    );
+    m.def(
+        "get_network_accel_note",
+        []() {
+            return NetworkAccelCoordinator::instance().note();
+        }
+    );
+    m.def(
+        "get_network_accel_parallel_partitions",
+        []() {
+            return NetworkAccelCoordinator::instance().parallelPartitions();
+        }
+    );
+    m.def(
+        "get_network_accel_queue_summary",
+        []() {
+            return NetworkAccelCoordinator::instance().queueSummary();
+        }
+    );
 }
 EmbeddedPyBind embed_("sim", &sim_pybind);
 

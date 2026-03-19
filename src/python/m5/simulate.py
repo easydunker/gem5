@@ -53,6 +53,7 @@ from m5.util.dot_writer_ruby import do_ruby_dot
 from _m5 import core as _m5_core
 from _m5 import drain as _m5_drain
 from _m5 import event as _m5_event
+from _m5 import sim as _m5_sim
 from _m5.stats import updateEvents as updateStatEvents
 
 from . import (
@@ -242,6 +243,50 @@ def instantiate(ckpt_dir=None):
 
 
 need_startup = True
+
+
+def setNetworkAcceleration(mode: str = "off", workers: int = 1) -> None:
+    _m5_sim.configure_network_accel(mode, workers)
+
+
+def resetNetworkAcceleration() -> None:
+    _m5_sim.reset_network_accel()
+
+
+def getNetworkAccelerationMode() -> str:
+    return _m5_sim.get_network_accel_mode()
+
+
+def getNetworkAccelerationWorkers() -> int:
+    return _m5_sim.get_network_accel_workers()
+
+
+def activateParallelNetworkAcceleration(partitions: int) -> None:
+    _m5_sim.activate_parallel_network_accel(partitions)
+
+
+def getRequestedNetworkAccelerationMode() -> str:
+    return _m5_sim.get_network_accel_requested_mode()
+
+
+def getRequestedNetworkAccelerationWorkers() -> int:
+    return _m5_sim.get_network_accel_requested_workers()
+
+
+def networkAccelerationDowngraded() -> bool:
+    return _m5_sim.network_accel_downgraded()
+
+
+def getNetworkAccelerationNote() -> str:
+    return _m5_sim.get_network_accel_note()
+
+
+def getNetworkAccelerationParallelPartitions() -> int:
+    return _m5_sim.get_network_accel_parallel_partitions()
+
+
+def getNetworkAccelerationQueueSummary() -> str:
+    return _m5_sim.get_network_accel_queue_summary()
 
 
 def simulate(*args, **kwargs):
