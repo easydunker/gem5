@@ -19,70 +19,12 @@ addToPath("../../../../configs/common")
 addToPath("../../../../configs/ruby")
 
 from common import Options  # noqa: E402
+from NetworkAccel import (  # noqa: E402
+    add_network_accel_options,
+    configure_network_accel,
+    format_partition_summary_lines,
+)
 from ruby import Ruby  # noqa: E402
-
-
-def _set_subtree_eventq(obj, eventq_index):
-    for child in obj.descendants():
-        child.eventq_index = eventq_index
-    obj.eventq_index = eventq_index
-
-
-def _configure_parallel_router_domains(root, system, requested_workers):
-    routers = list(system.ruby.network.routers)
-    if len(routers) < 2:
-        raise RuntimeError(
-            "Parallel NoC mode requires at least two routers/partitions."
-        )
-
-    active_workers = min(requested_workers, len(routers))
-    if active_workers < 2:
-        raise RuntimeError(
-            "Parallel NoC mode requires at least two active workers."
-        )
-
-    def queue_for_router(router_index):
-        return 1 + (int(router_index) % active_workers)
-
-    for router in routers:
-        _set_subtree_eventq(router, queue_for_router(router.router_id))
-
-    for i, cpu in enumerate(system.cpu):
-        _set_subtree_eventq(cpu, queue_for_router(i))
-
-    for i, ctrl in enumerate(system.ruby._cpu_ports):
-        _set_subtree_eventq(ctrl, queue_for_router(i))
-
-    l1_ctrls = [getattr(system.ruby, f"l1_cntrl{i}") for i in range(len(routers))]
-    for i, ctrl in enumerate(l1_ctrls):
-        _set_subtree_eventq(ctrl, queue_for_router(i))
-
-    dir_ctrls = [getattr(system.ruby, f"dir_cntrl{i}") for i in range(len(routers))]
-    for i, ctrl in enumerate(dir_ctrls):
-        _set_subtree_eventq(ctrl, queue_for_router(i))
-
-    for i, mem_ctrl in enumerate(system.mem_ctrls):
-        _set_subtree_eventq(mem_ctrl, queue_for_router(i % len(routers)))
-
-    for i, netif in enumerate(system.ruby.network.netifs):
-        _set_subtree_eventq(netif, queue_for_router(i % len(routers)))
-
-    for i, ext_link in enumerate(system.ruby.network.ext_links):
-        _set_subtree_eventq(ext_link, queue_for_router(i % len(routers)))
-
-    for int_link in system.ruby.network.int_links:
-        src_queue = queue_for_router(int_link.src_node.router_id)
-        dst_queue = queue_for_router(int_link.dst_node.router_id)
-        _set_subtree_eventq(int_link.network_link, src_queue)
-        _set_subtree_eventq(int_link.src_net_bridge, src_queue)
-        _set_subtree_eventq(int_link.src_cred_bridge, src_queue)
-        _set_subtree_eventq(int_link.dst_net_bridge, dst_queue)
-        _set_subtree_eventq(int_link.credit_link, dst_queue)
-        _set_subtree_eventq(int_link.dst_cred_bridge, dst_queue)
-        int_link.eventq_index = src_queue
-
-    root.sim_quantum = 1
-    m5.activateParallelNetworkAcceleration(len(routers))
 
 
 def build_parser():
@@ -116,20 +58,7 @@ def build_parser():
         choices=[-1, 0, 1, 2],
     )
 
-    # Future feature knobs. These are parsed now so tests can be stable
-    # before/after feature implementation.
-    parser.add_argument(
-        "--parallel-noc-mode",
-        default="off",
-        choices=["off", "serial_batched", "parallel"],
-        help="Future Garnet parallel execution mode.",
-    )
-    parser.add_argument(
-        "--parallel-noc-workers",
-        type=int,
-        default=1,
-        help="Future worker count for parallel NoC mode.",
-    )
+    add_network_accel_options(parser)
 
     Ruby.define_options(parser)
     return parser
@@ -139,8 +68,7 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    requested_mode = args.parallel_noc_mode
-    m5.setNetworkAcceleration(requested_mode, args.parallel_noc_workers)
+    requested_mode = args.network_accel_mode
 
     if args.num_dirs != args.num_cpus:
         raise RuntimeError(
@@ -181,10 +109,15 @@ def main():
     root.system.mem_mode = "timing"
     m5.ticks.setGlobalFrequency("1ps")
 
-    if requested_mode == "parallel":
-        _configure_parallel_router_domains(
-            root, system, args.parallel_noc_workers
-        )
+    partition_summary = configure_network_accel(
+        root,
+        system,
+        requested_mode,
+        args.network_accel_workers,
+        partitioner=args.network_accel_partitioner,
+        auto_shape=args.network_accel_auto_shape,
+        max_workers=args.network_accel_max_workers,
+    )
 
     effective_mode = m5.getNetworkAccelerationMode()
     effective_workers = m5.getNetworkAccelerationWorkers()
@@ -206,6 +139,8 @@ def main():
             f"queues={m5.getNetworkAccelerationQueueSummary()} "
             f"sim_quantum={root.sim_quantum}"
         )
+        for line in format_partition_summary_lines(partition_summary):
+            print(line)
     if m5.networkAccelerationDowngraded():
         print(
             "PARALLEL_NOC_NOTE "
@@ -224,6 +159,7 @@ def main():
         # Global exit delivery in multi-event-queue mode is scheduled one
         # quantum after the workload-completion event.
         metric_tick -= int(root.sim_quantum)
+    m5.stats.dump()
     stats_path = os.path.join(m5.options.outdir, "stats.txt")
     print(
         f"Exiting @ tick {exit_tick} because {exit_event.getCause()}"
@@ -233,6 +169,12 @@ def main():
         f"tick={metric_tick} exit_tick={exit_tick} "
         f"cause={exit_event.getCause()}"
     )
+    if effective_mode == "parallel":
+        print(
+            "PARALLEL_NOC_RUNTIME "
+            f"entered={m5.getNetworkAccelerationActiveQueueSummary()} "
+            f"dispatches={m5.getNetworkAccelerationDispatchSummary()}"
+        )
     print(
         "PARALLEL_NOC_STATS "
         f"path={stats_path} exists={os.path.isfile(stats_path)}"

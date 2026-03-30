@@ -38,6 +38,11 @@ from m5.util import addToPath
 addToPath("../")
 
 from common import Options
+from ruby.NetworkAccel import (
+    add_network_accel_options,
+    configure_network_accel,
+    format_partition_summary_lines,
+)
 from ruby import Ruby
 
 # Get paths we might need.  It's expected this file is in m5/configs/example.
@@ -120,6 +125,8 @@ parser.add_argument(
                         Set to -1 to inject randomly in all vnets.",
 )
 
+add_network_accel_options(parser)
+
 #
 # Add the ruby specific and protocol specific options
 #
@@ -177,6 +184,19 @@ root.system.mem_mode = "timing"
 
 # Not much point in this being higher than the L1 latency
 m5.ticks.setGlobalFrequency("1ps")
+
+partition_summary = configure_network_accel(
+    root,
+    system,
+    args.network_accel_mode,
+    args.network_accel_workers,
+    partitioner=args.network_accel_partitioner,
+    auto_shape=args.network_accel_auto_shape,
+    max_workers=args.network_accel_max_workers,
+)
+if args.network_accel_report_partitions and partition_summary:
+    for line in format_partition_summary_lines(partition_summary):
+        print(line)
 
 # instantiate configuration
 m5.instantiate()
