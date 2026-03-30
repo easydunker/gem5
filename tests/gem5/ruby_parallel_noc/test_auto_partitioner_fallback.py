@@ -134,3 +134,91 @@ gem5_verify_config(
     uses_kvm=False,
 )
 
+gem5_verify_config(
+    name="ruby-parallel-noc-fallback-router-chunks",
+    fixtures=(),
+    verifiers=(
+        NamedMatchRegex(
+            "parallel-noc-mode-line",
+            r"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
+            r"WORKERS=2 NUM_CPUS=4$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-coordinator-line",
+            r"^PARALLEL_NOC_COORDINATOR mode=parallel workers=2$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partition-line",
+            r"^PARALLEL_NOC_PARTITION partitions=8 queues=1,2 "
+            r"sim_quantum=1$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partitioner-line",
+            r"^PARALLEL_NOC_PARTITIONER requested=topology_auto "
+            r"strategy=graph_bfs reason=graph_connected "
+            r"auto_shape=router_chunks requested_workers=auto "
+            r"effective_workers=2 routers=8 partitions=2$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partition-map-line",
+            r"^PARALLEL_NOC_PARTITION_MAP queues=1:\[0,1,2,3\];2:\[4,5,6,7\]$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-topology-line",
+            r"^PARALLEL_NOC_TOPOLOGY topology=Pt2Pt rows=na cols=na "
+            r"routers=0,1,2,3,4,5,6,7$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-metric-line",
+            r"^PARALLEL_NOC_METRIC tick=2000 exit_tick=2001 cause=Network "
+            r"Tester completed simCycles$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-stats-line",
+            r"^PARALLEL_NOC_STATS path=.*[/\\]stats\.txt exists=True$",
+        ),
+        NamedStatsFileExists("parallel-noc-stats-file-exists"),
+    ),
+    config=joinpath(
+        config.base_dir,
+        "tests",
+        "gem5",
+        "ruby_parallel_noc",
+        "configs",
+        "ruby_garnet_equiv.py",
+    ),
+    config_args=[
+        "--network-accel-mode",
+        "parallel",
+        "--network-accel-workers",
+        "auto",
+        "--network-accel-max-workers",
+        "2",
+        "--network-accel-partitioner",
+        "topology_auto",
+        "--network-accel-auto-shape",
+        "router_chunks",
+        "--network-accel-report-partitions",
+        "--network",
+        "garnet",
+        "--topology",
+        "Pt2Pt",
+        "--num-cpus",
+        "4",
+        "--num-dirs",
+        "4",
+        "--sim-cycles",
+        "2000",
+        "--synthetic",
+        "uniform_random",
+        "--injectionrate",
+        "0.02",
+        "--routing-algorithm",
+        "1",
+    ],
+    valid_isas=(constants.null_tag,),
+    valid_hosts=constants.supported_hosts,
+    length=constants.quick_tag,
+    protocol="Garnet_standalone",
+    uses_kvm=False,
+)

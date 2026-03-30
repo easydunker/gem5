@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from collections import deque
 
@@ -239,6 +240,24 @@ def _select_best_candidate(topology, candidates, strategy, reason):
     )
 
 
+def _select_best_result(topology, candidates, preferred_strategy=None):
+    if not candidates:
+        raise PartitionStrategyError("no strategy candidates were provided")
+
+    scored = []
+    for result in candidates:
+        scored.append(
+            (
+                _partition_score(topology, result.plan),
+                0 if result.strategy == preferred_strategy else 1,
+                result.strategy,
+                result,
+            )
+        )
+    scored.sort(key=lambda item: item[:3])
+    return scored[0][3]
+
+
 def build_mesh_blocks_plan(topology, partition_count):
     candidates = _mesh_grid_candidates(topology, partition_count)
     return _select_best_candidate(
@@ -286,7 +305,14 @@ def useful_partition_count(topology, worker_cap):
         raise PartitionStrategyError(
             "parallel network acceleration requires at least two workers"
         )
-    return min(worker_cap, len(topology.router_ids))
+
+    if topology.topology_name == "Mesh_XY":
+        if topology.mesh_rows is None or topology.mesh_cols is None:
+            raise PartitionStrategyError("Mesh_XY topology is missing shape data")
+        useful = max(2, min(topology.mesh_rows, topology.mesh_cols))
+    else:
+        useful = max(2, int(math.isqrt(len(topology.router_ids))))
+    return min(worker_cap, useful, len(topology.router_ids))
 
 
 def build_topology_auto_partition_plan(
@@ -299,21 +325,31 @@ def build_topology_auto_partition_plan(
 
     if topology.topology_name == "Mesh_XY":
         if requested_shape == "mesh_blocks":
-            try:
-                return build_mesh_blocks_plan(topology, partition_count)
-            except PartitionStrategyError:
+            candidates = []
+            for builder in (build_mesh_blocks_plan, build_mesh_strips_plan):
                 try:
-                    return build_mesh_strips_plan(topology, partition_count)
+                    candidates.append(builder(topology, partition_count))
                 except PartitionStrategyError:
-                    pass
+                    continue
+            if candidates:
+                return _select_best_result(
+                    topology,
+                    candidates,
+                    preferred_strategy="mesh_blocks",
+                )
         elif requested_shape == "mesh_strips":
-            try:
-                return build_mesh_strips_plan(topology, partition_count)
-            except PartitionStrategyError:
+            candidates = []
+            for builder in (build_mesh_blocks_plan, build_mesh_strips_plan):
                 try:
-                    return build_mesh_blocks_plan(topology, partition_count)
+                    candidates.append(builder(topology, partition_count))
                 except PartitionStrategyError:
-                    pass
+                    continue
+            if candidates:
+                return _select_best_result(
+                    topology,
+                    candidates,
+                    preferred_strategy="mesh_strips",
+                )
         elif requested_shape == "graph_bfs":
             try:
                 return build_graph_bfs_plan(topology, partition_count)

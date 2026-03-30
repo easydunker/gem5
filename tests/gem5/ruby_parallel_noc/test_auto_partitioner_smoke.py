@@ -56,6 +56,9 @@ def add_auto_partitioner_suite(
     partition_count,
     partition_map,
 ):
+    queue_summary = ",".join(
+        str(queue) for queue in range(1, effective_workers + 1)
+    )
     active_queue_summary = ",".join(
         f"{queue}:1" for queue in range(0, effective_workers + 1)
     )
@@ -78,8 +81,8 @@ def add_auto_partitioner_suite(
             ),
             NamedMatchRegex(
                 "parallel-noc-partition-line",
-                r"^PARALLEL_NOC_PARTITION partitions=4 "
-                r"queues=(1,2,3|1,2,3,4) sim_quantum=1$",
+                rf"^PARALLEL_NOC_PARTITION partitions=4 "
+                rf"queues={queue_summary} sim_quantum=1$",
             ),
             NamedMatchRegex(
                 "parallel-noc-partitioner-line",
@@ -169,11 +172,11 @@ add_auto_partitioner_suite(
 add_auto_partitioner_suite(
     name="ruby-parallel-noc-topology-auto-partitioner-smoke",
     partitioner="topology_auto",
-    strategy="mesh_blocks",
-    reason="mesh_xy_rectangular",
+    strategy="mesh_strips",
+    reason="mesh_xy_strips",
     workers="auto",
     auto_shape="mesh_strips",
-    effective_workers=4,
-    partition_count=4,
-    partition_map=r"1:\[0\];2:\[1\];3:\[2\];4:\[3\]",
+    effective_workers=2,
+    partition_count=2,
+    partition_map=r"1:\[0,1\];2:\[2,3\]",
 )

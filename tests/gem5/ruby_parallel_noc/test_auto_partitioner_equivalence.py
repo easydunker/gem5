@@ -52,7 +52,7 @@ gem5_verify_config(
         NamedMatchRegex(
             "parallel-noc-mode-line",
             r"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
-            r"WORKERS=4 NUM_CPUS=4$",
+            r"WORKERS=2 NUM_CPUS=4$",
         ),
         NamedMatchRegex(
             "parallel-noc-partitioner-line",
@@ -60,7 +60,7 @@ gem5_verify_config(
             r"strategy=mesh_blocks "
             r"reason=mesh_xy_rectangular "
             r"auto_shape=mesh_blocks requested_workers=auto "
-            r"effective_workers=4 routers=4 partitions=4$",
+            r"effective_workers=2 routers=4 partitions=2$",
         ),
         NamedMatchRegex(
             "parallel-noc-topology-line",

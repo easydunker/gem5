@@ -149,8 +149,7 @@ add_large_mesh_suite(
 add_large_mesh_suite(
     name="ruby-parallel-noc-large-mesh-strips",
     auto_shape="mesh_strips",
-    strategy="mesh_strips",
-    reason="mesh_xy_strips",
-    partition_map=r"1:\[0,1,2,3\];2:\[4,5,6,7\];3:\[8,9,10,11\];4:\[12,13,14,15\]",
+    strategy="mesh_blocks",
+    reason="mesh_xy_rectangular",
+    partition_map=r"1:\[0,1,4,5\];2:\[2,3,6,7\];3:\[8,9,12,13\];4:\[10,11,14,15\]",
 )
-

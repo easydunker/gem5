@@ -246,6 +246,17 @@ def _apply_partition_plan(root, system, plan, topology=None):
 
         for i, ext_link in enumerate(system.ruby.network.ext_links):
             _set_subtree_eventq(ext_link, queue_for_router(router_id_for_index(i)))
+
+        for int_link in system.ruby.network.int_links:
+            src_queue = queue_for_router(int(int_link.src_node.router_id))
+            dst_queue = queue_for_router(int(int_link.dst_node.router_id))
+            _set_subtree_eventq(int_link.network_link, src_queue)
+            _set_subtree_eventq(int_link.src_net_bridge, src_queue)
+            _set_subtree_eventq(int_link.src_cred_bridge, src_queue)
+            _set_subtree_eventq(int_link.dst_net_bridge, dst_queue)
+            _set_subtree_eventq(int_link.credit_link, dst_queue)
+            _set_subtree_eventq(int_link.dst_cred_bridge, dst_queue)
+            int_link.eventq_index = src_queue
     else:
         router_queue = {
             int(router.router_id): queue_for_router(int(router.router_id))
@@ -311,27 +322,16 @@ def configure_network_accel(
             try:
                 topology = extract_topology(system)
             except TopologyExtractionError as error:
-                topology = None
-            if topology is not None:
-                selection = build_topology_auto_partition_plan(
-                    topology,
-                    requested_shape=auto_shape,
-                    worker_cap=worker_cap,
-                )
-                runtime_workers = selection.plan.partition_count
-            else:
-                runtime_workers = min(
-                    worker_cap,
-                    len(system.ruby.network.routers),
-                )
-                selection = PartitionStrategyResult(
-                    plan=_build_router_chunks_partition_plan(
-                        [int(router.router_id) for router in _sorted_routers(system)],
-                        runtime_workers,
-                    ),
-                    strategy="router_chunks",
-                    reason="topology_extraction_failed",
-                )
+                raise RuntimeError(
+                    "topology_auto partitioner could not extract a deterministic "
+                    f"Ruby/Garnet ownership graph: {error}"
+                ) from error
+            selection = build_topology_auto_partition_plan(
+                topology,
+                requested_shape=auto_shape,
+                worker_cap=worker_cap,
+            )
+            runtime_workers = selection.plan.partition_count
         else:
             runtime_workers = min(worker_cap, len(system.ruby.network.routers))
     elif requested_workers != _AUTO_WORKERS:
@@ -349,15 +349,6 @@ def configure_network_accel(
             ),
             strategy="manual",
             reason="as_requested",
-        )
-    elif topology is None:
-        selection = PartitionStrategyResult(
-            plan=_build_router_chunks_partition_plan(
-                [int(router.router_id) for router in _sorted_routers(system)],
-                runtime_workers,
-            ),
-            strategy="router_chunks",
-            reason="topology_extraction_failed",
         )
 
     _apply_partition_plan(root, system, selection.plan, topology=topology)
