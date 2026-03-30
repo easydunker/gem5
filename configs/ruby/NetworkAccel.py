@@ -6,6 +6,8 @@ if __package__:
     from .network_accel import (
         PartitionPlan,
         RouterPartition,
+        TopologyExtractionError,
+        extract_topology,
         format_partition_summary_lines,
         summarize_partition_plan,
     )
@@ -13,6 +15,8 @@ else:
     from network_accel import (
         PartitionPlan,
         RouterPartition,
+        TopologyExtractionError,
+        extract_topology,
         format_partition_summary_lines,
         summarize_partition_plan,
     )
@@ -218,6 +222,7 @@ def configure_network_accel(
     auto_shape="mesh_blocks",
     max_workers=None,
 ):
+    topology = None
     runtime_workers = 1
     if requested_mode == "parallel":
         runtime_workers = _resolve_parallel_workers(
@@ -225,6 +230,14 @@ def configure_network_accel(
             requested_workers,
             max_workers,
         )
+        if partitioner == "topology_auto":
+            try:
+                topology = extract_topology(system)
+            except TopologyExtractionError as error:
+                raise RuntimeError(
+                    "topology_auto partitioner could not extract a deterministic "
+                    f"Ruby/Garnet ownership graph: {error}"
+                ) from error
     elif requested_workers != _AUTO_WORKERS:
         runtime_workers = requested_workers
 
@@ -251,6 +264,7 @@ def configure_network_accel(
         requested_workers=str(requested_workers),
         effective_workers=runtime_workers,
         reason=fallback_reason,
+        topology=topology,
     )
 
 

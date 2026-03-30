@@ -444,7 +444,7 @@ git commit -m "feat(noc): add smart partitioner public surface"
 - Modify: `configs/ruby/NetworkAccel.py`
 - Create: `tests/gem5/ruby_parallel_noc/test_auto_partitioner_equivalence.py`
 
-- [ ] **Step 1: Extract routers and internal links from the existing Ruby network**
+- [x] **Step 1: Extract routers and internal links from the existing Ruby network**
 
 The extractor must discover:
 
@@ -454,11 +454,11 @@ The extractor must discover:
 - network interfaces,
 - controller-like objects reachable from ext links or Ruby object tables.
 
-- [ ] **Step 2: Infer `Mesh_XY` shape when applicable**
+- [x] **Step 2: Infer `Mesh_XY` shape when applicable**
 
 Use configuration/topology metadata first. Only infer from router IDs if the metadata is insufficient and the inference is deterministic.
 
-- [ ] **Step 3: Add exact unit-level expectations for extraction**
+- [x] **Step 3: Add exact unit-level expectations for extraction**
 
 At minimum, the test plan should validate:
 
@@ -467,11 +467,11 @@ At minimum, the test plan should validate:
 - internal-link directionality is preserved,
 - attached ext-link/controller ownership is deterministic.
 
-- [ ] **Step 4: Reject incomplete extraction cleanly**
+- [x] **Step 4: Reject incomplete extraction cleanly**
 
 If ownership cannot be proven, emit an explicit note and downgrade/reject `parallel`.
 
-- [ ] **Step 5: Run focused correctness coverage in Docker**
+- [x] **Step 5: Run focused correctness coverage in Docker**
 
 Use the same suite-discovery rule:
 
@@ -485,7 +485,7 @@ docker run --rm \
   ./main.py run -vv --skip-build --uid '<fill after listing>'
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add configs/ruby/NetworkAccel.py \
@@ -497,10 +497,10 @@ git commit -m "feat(noc): extract deterministic Ruby Garnet partition graph"
 
 **Checklist (Chunk 2)**
 
-- [ ] Router graph extraction is deterministic.
-- [ ] `Mesh_XY` classification is explicit.
-- [ ] Ownership of attached objects is reproducible.
-- [ ] Unsupported cases fail loudly.
+- [x] Router graph extraction is deterministic.
+- [x] `Mesh_XY` classification is explicit.
+- [x] Ownership of attached objects is reproducible.
+- [x] Unsupported cases fail loudly.
 
 ---
 
