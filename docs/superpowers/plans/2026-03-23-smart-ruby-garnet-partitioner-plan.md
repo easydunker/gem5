@@ -515,22 +515,22 @@ git commit -m "feat(noc): extract deterministic Ruby Garnet partition graph"
 - Create: `tests/gem5/ruby_parallel_noc/test_auto_partitioner_large_mesh.py`
 - Create: `tests/gem5/ruby_parallel_noc/test_auto_partitioner_fallback.py`
 
-- [ ] **Step 1: Implement `mesh_blocks`**
+- [x] **Step 1: Implement `mesh_blocks`**
 
 For `Mesh_XY`, generate contiguous rectangular partitions. Score candidate shapes using the tuple described above.
 
-- [ ] **Step 2: Implement `mesh_strips`**
+- [x] **Step 2: Implement `mesh_strips`**
 
 Add row- or column-strip partitioning as an alternative candidate. Keep it deterministic and comparable to `mesh_blocks`.
 
-- [ ] **Step 3: Implement deterministic non-mesh fallback**
+- [x] **Step 3: Implement deterministic non-mesh fallback**
 
 Recommended order:
 
 - `graph_bfs` if graph extraction is complete,
 - `router_chunks` only as the last conservative fallback.
 
-- [ ] **Step 4: Attach objects to chosen router partitions**
+- [x] **Step 4: Attach objects to chosen router partitions**
 
 The plan must explicitly assign:
 
@@ -542,7 +542,7 @@ The plan must explicitly assign:
 - controller objects,
 - internal-link halves.
 
-- [ ] **Step 5: Bound worker count safely**
+- [x] **Step 5: Bound worker count safely**
 
 If `requested_workers` is `auto`, resolve it from host-visible CPU count. Use:
 
@@ -551,7 +551,7 @@ If `requested_workers` is `auto`, resolve it from host-visible CPU count. Use:
 - then subtract one for the main queue,
 - then clamp to useful partition count and any user cap.
 
-- [ ] **Step 6: Print deterministic summary lines**
+- [x] **Step 6: Print deterministic summary lines**
 
 The same topology and options must yield the same:
 
@@ -560,7 +560,7 @@ The same topology and options must yield the same:
 - queue-to-router map,
 - downgrade/fallback note.
 
-- [ ] **Step 7: Run large-mesh focused validation in Docker**
+- [x] **Step 7: Run large-mesh focused validation in Docker**
 
 Target case:
 
@@ -569,7 +569,7 @@ Target case:
 - `--num-dirs 16`
 - `--mesh-rows 4`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add configs/ruby/NetworkAccel.py \
@@ -582,10 +582,10 @@ git commit -m "feat(noc): add topology-aware smart partitioning"
 
 **Checklist (Chunk 3)**
 
-- [ ] `Mesh_XY` gets locality-aware partitions.
-- [ ] Worker counts are bounded deterministically.
-- [ ] Fallback behavior is explicit.
-- [ ] Queue-to-router maps are stable across repeats.
+- [x] `Mesh_XY` gets locality-aware partitions.
+- [x] Worker counts are bounded deterministically.
+- [x] Fallback behavior is explicit.
+- [x] Queue-to-router maps are stable across repeats.
 
 ---
 

@@ -46,43 +46,38 @@ class NamedStatsFileExists(verifier.Verifier):
 
 
 gem5_verify_config(
-    name="ruby-parallel-noc-topology-auto-equivalence",
+    name="ruby-parallel-noc-fallback-graph-bfs",
     fixtures=(),
     verifiers=(
         NamedMatchRegex(
             "parallel-noc-mode-line",
             r"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
-            r"WORKERS=4 NUM_CPUS=4$",
+            r"WORKERS=2 NUM_CPUS=4$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-coordinator-line",
+            r"^PARALLEL_NOC_COORDINATOR mode=parallel workers=2$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partition-line",
+            r"^PARALLEL_NOC_PARTITION partitions=8 queues=1,2 "
+            r"sim_quantum=1$",
         ),
         NamedMatchRegex(
             "parallel-noc-partitioner-line",
             r"^PARALLEL_NOC_PARTITIONER requested=topology_auto "
-            r"strategy=mesh_blocks "
-            r"reason=mesh_xy_rectangular "
-            r"auto_shape=mesh_blocks requested_workers=auto "
-            r"effective_workers=4 routers=4 partitions=4$",
+            r"strategy=graph_bfs reason=graph_connected "
+            r"auto_shape=graph_bfs requested_workers=auto "
+            r"effective_workers=2 routers=8 partitions=2$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partition-map-line",
+            r"^PARALLEL_NOC_PARTITION_MAP queues=1:\[0,1,2,3\];2:\[4,5,6,7\]$",
         ),
         NamedMatchRegex(
             "parallel-noc-topology-line",
-            r"^PARALLEL_NOC_TOPOLOGY topology=Mesh_XY rows=2 cols=2 "
-            r"routers=0,1,2,3$",
-        ),
-        NamedMatchRegex(
-            "parallel-noc-topology-links-line",
-            r"^PARALLEL_NOC_TOPOLOGY_LINKS "
-            r"links=0>1,0>2,1>0,1>3,2>0,2>3,3>1,3>2$",
-        ),
-        NamedMatchRegex(
-            "parallel-noc-topology-owners-line",
-            r"^PARALLEL_NOC_TOPOLOGY_ATTACH "
-            r"owners=0:\[cpu:0,cpu_port:0,ctrl:dir_cntrl0,ctrl:l1_cntrl0,"
-            r"ext:0,ext:4,netif:0,netif:4\];"
-            r"1:\[cpu:1,cpu_port:1,ctrl:dir_cntrl1,ctrl:l1_cntrl1,"
-            r"ext:1,ext:5,netif:1,netif:5\];"
-            r"2:\[cpu:2,cpu_port:2,ctrl:dir_cntrl2,ctrl:l1_cntrl2,"
-            r"ext:2,ext:6,netif:2,netif:6\];"
-            r"3:\[cpu:3,cpu_port:3,ctrl:dir_cntrl3,ctrl:l1_cntrl3,"
-            r"ext:3,ext:7,netif:3,netif:7\]$",
+            r"^PARALLEL_NOC_TOPOLOGY topology=Pt2Pt rows=na cols=na "
+            r"routers=0,1,2,3,4,5,6,7$",
         ),
         NamedMatchRegex(
             "parallel-noc-metric-line",
@@ -108,21 +103,21 @@ gem5_verify_config(
         "parallel",
         "--network-accel-workers",
         "auto",
+        "--network-accel-max-workers",
+        "2",
         "--network-accel-partitioner",
         "topology_auto",
         "--network-accel-auto-shape",
-        "mesh_blocks",
+        "graph_bfs",
         "--network-accel-report-partitions",
         "--network",
         "garnet",
         "--topology",
-        "Mesh_XY",
+        "Pt2Pt",
         "--num-cpus",
         "4",
         "--num-dirs",
         "4",
-        "--mesh-rows",
-        "2",
         "--sim-cycles",
         "2000",
         "--synthetic",
@@ -138,3 +133,4 @@ gem5_verify_config(
     protocol="Garnet_standalone",
     uses_kvm=False,
 )
+

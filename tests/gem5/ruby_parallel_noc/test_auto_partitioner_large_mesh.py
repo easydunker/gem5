@@ -45,59 +45,40 @@ class NamedStatsFileExists(verifier.Verifier):
             test_util.fail(f"Could not find expected stats file: {stats_path}")
 
 
-def add_auto_partitioner_suite(
-    name,
-    partitioner,
-    strategy,
-    reason,
-    workers,
-    auto_shape,
-    effective_workers,
-    partition_count,
-    partition_map,
-):
-    active_queue_summary = ",".join(
-        f"{queue}:1" for queue in range(0, effective_workers + 1)
-    )
-    dispatch_summary = ",".join(
-        f"{queue}:\\d+" for queue in range(0, effective_workers + 1)
-    )
+def add_large_mesh_suite(name, auto_shape, strategy, reason, partition_map):
     gem5_verify_config(
         name=name,
         fixtures=(),
         verifiers=(
             NamedMatchRegex(
                 "parallel-noc-mode-line",
-                rf"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
-                rf"WORKERS={effective_workers} NUM_CPUS=4$",
+                r"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
+                r"WORKERS=4 NUM_CPUS=16$",
             ),
             NamedMatchRegex(
                 "parallel-noc-coordinator-line",
-                rf"^PARALLEL_NOC_COORDINATOR mode=parallel "
-                rf"workers={effective_workers}$",
+                r"^PARALLEL_NOC_COORDINATOR mode=parallel workers=4$",
             ),
             NamedMatchRegex(
                 "parallel-noc-partition-line",
-                r"^PARALLEL_NOC_PARTITION partitions=4 "
-                r"queues=(1,2,3|1,2,3,4) sim_quantum=1$",
+                r"^PARALLEL_NOC_PARTITION partitions=16 queues=1,2,3,4 "
+                r"sim_quantum=1$",
             ),
             NamedMatchRegex(
                 "parallel-noc-partitioner-line",
-                rf"^PARALLEL_NOC_PARTITIONER requested={partitioner} "
-                rf"strategy={strategy} "
-                rf"reason={reason} "
-                rf"auto_shape={auto_shape} requested_workers={workers} "
-                rf"effective_workers={effective_workers} "
-                rf"routers=4 partitions={partition_count}$",
+                rf"^PARALLEL_NOC_PARTITIONER requested=topology_auto "
+                rf"strategy={strategy} reason={reason} "
+                rf"auto_shape={auto_shape} requested_workers=auto "
+                rf"effective_workers=4 routers=16 partitions=4$",
             ),
             NamedMatchRegex(
                 "parallel-noc-partition-map-line",
                 rf"^PARALLEL_NOC_PARTITION_MAP queues={partition_map}$",
             ),
             NamedMatchRegex(
-                "parallel-noc-runtime-line",
-                rf"^PARALLEL_NOC_RUNTIME entered={active_queue_summary} "
-                rf"dispatches={dispatch_summary}$",
+                "parallel-noc-topology-line",
+                r"^PARALLEL_NOC_TOPOLOGY topology=Mesh_XY rows=4 cols=4 "
+                r"routers=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15$",
             ),
             NamedMatchRegex(
                 "parallel-noc-metric-line",
@@ -122,21 +103,24 @@ def add_auto_partitioner_suite(
             "--network-accel-mode",
             "parallel",
             "--network-accel-workers",
-            str(workers),
+            "auto",
+            "--network-accel-max-workers",
+            "4",
             "--network-accel-partitioner",
-            partitioner,
+            "topology_auto",
             "--network-accel-auto-shape",
             auto_shape,
+            "--network-accel-report-partitions",
             "--network",
             "garnet",
             "--topology",
             "Mesh_XY",
             "--num-cpus",
-            "4",
+            "16",
             "--num-dirs",
-            "4",
+            "16",
             "--mesh-rows",
-            "2",
+            "4",
             "--sim-cycles",
             "2000",
             "--synthetic",
@@ -154,26 +138,19 @@ def add_auto_partitioner_suite(
     )
 
 
-add_auto_partitioner_suite(
-    name="ruby-parallel-noc-manual-partitioner-smoke",
-    partitioner="manual",
-    strategy="manual",
-    reason="as_requested",
-    workers=3,
+add_large_mesh_suite(
+    name="ruby-parallel-noc-large-mesh-blocks",
     auto_shape="mesh_blocks",
-    effective_workers=3,
-    partition_count=3,
-    partition_map=r"1:\[0,3\];2:\[1\];3:\[2\]",
-)
-
-add_auto_partitioner_suite(
-    name="ruby-parallel-noc-topology-auto-partitioner-smoke",
-    partitioner="topology_auto",
     strategy="mesh_blocks",
     reason="mesh_xy_rectangular",
-    workers="auto",
-    auto_shape="mesh_strips",
-    effective_workers=4,
-    partition_count=4,
-    partition_map=r"1:\[0\];2:\[1\];3:\[2\];4:\[3\]",
+    partition_map=r"1:\[0,1,4,5\];2:\[2,3,6,7\];3:\[8,9,12,13\];4:\[10,11,14,15\]",
 )
+
+add_large_mesh_suite(
+    name="ruby-parallel-noc-large-mesh-strips",
+    auto_shape="mesh_strips",
+    strategy="mesh_strips",
+    reason="mesh_xy_strips",
+    partition_map=r"1:\[0,1,2,3\];2:\[4,5,6,7\];3:\[8,9,10,11\];4:\[12,13,14,15\]",
+)
+

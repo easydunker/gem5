@@ -1,12 +1,15 @@
 import argparse
-
+import os
 import m5
 
 if __package__:
     from .network_accel import (
         PartitionPlan,
+        PartitionStrategyError,
+        PartitionStrategyResult,
         RouterPartition,
         TopologyExtractionError,
+        build_topology_auto_partition_plan,
         extract_topology,
         format_partition_summary_lines,
         summarize_partition_plan,
@@ -14,8 +17,11 @@ if __package__:
 else:
     from network_accel import (
         PartitionPlan,
+        PartitionStrategyError,
+        PartitionStrategyResult,
         RouterPartition,
         TopologyExtractionError,
+        build_topology_auto_partition_plan,
         extract_topology,
         format_partition_summary_lines,
         summarize_partition_plan,
@@ -101,13 +107,23 @@ def _sorted_routers(system):
     )
 
 
-def _resolve_parallel_workers(router_count, requested_workers, max_workers):
-    effective_workers = (
-        router_count if requested_workers == _AUTO_WORKERS else requested_workers
-    )
+def _resolve_worker_cap(requested_workers, max_workers):
+    if requested_workers == _AUTO_WORKERS:
+        if hasattr(os, "sched_getaffinity"):
+            try:
+                host_cpus = len(os.sched_getaffinity(0))
+            except OSError:
+                host_cpus = 0
+        else:
+            host_cpus = 0
+        if host_cpus < 1:
+            host_cpus = os.cpu_count() or 1
+        effective_workers = max(host_cpus - 1, 1)
+    else:
+        effective_workers = requested_workers
     if max_workers is not None:
         effective_workers = min(effective_workers, max_workers)
-    return min(effective_workers, router_count)
+    return effective_workers
 
 
 def _indexed_ruby_children(ruby_system, prefix):
@@ -119,6 +135,39 @@ def _indexed_ruby_children(ruby_system, prefix):
         if suffix.isdigit():
             children.append((int(suffix), getattr(ruby_system, name)))
     return [child for _, child in sorted(children)]
+
+
+def _balanced_slices(total, parts):
+    base, remainder = divmod(total, parts)
+    slices = []
+    start = 0
+    for index in range(parts):
+        size = base + (1 if index < remainder else 0)
+        stop = start + size
+        slices.append((start, stop))
+        start = stop
+    return tuple(slices)
+
+
+def _build_router_chunks_partition_plan(router_ids, partition_count):
+    if partition_count < 2:
+        raise PartitionStrategyError(
+            "parallel network acceleration requires at least two workers"
+        )
+    if partition_count > len(router_ids):
+        raise PartitionStrategyError(
+            "cannot assign more workers than routers"
+        )
+    router_ids = tuple(sorted(int(router_id) for router_id in router_ids))
+    slices = _balanced_slices(len(router_ids), partition_count)
+    queue_assignments = tuple(
+        (
+            queue,
+            RouterPartition(router_ids=tuple(router_ids[start:stop])),
+        )
+        for queue, (start, stop) in enumerate(slices, start=1)
+    )
+    return PartitionPlan(queue_assignments=queue_assignments)
 
 
 def _build_manual_partition_plan(system, effective_workers):
@@ -166,47 +215,79 @@ def _validate_phase_one_scope(plan, l1_ctrls, dir_ctrls):
         )
 
 
-def _apply_partition_plan(root, system, plan):
+def _apply_partition_plan(root, system, plan, topology=None):
     queue_for_router = plan.queue_for_router
-    router_id_for_index = plan.router_id_for_index
-    l1_ctrls = _indexed_ruby_children(system.ruby, "l1_cntrl")
-    dir_ctrls = _indexed_ruby_children(system.ruby, "dir_cntrl")
-    _validate_phase_one_scope(plan, l1_ctrls, dir_ctrls)
+    if topology is None:
+        router_id_for_index = plan.router_id_for_index
+        l1_ctrls = _indexed_ruby_children(system.ruby, "l1_cntrl")
+        dir_ctrls = _indexed_ruby_children(system.ruby, "dir_cntrl")
+        _validate_phase_one_scope(plan, l1_ctrls, dir_ctrls)
 
-    for router in system.ruby.network.routers:
-        _set_subtree_eventq(router, queue_for_router(int(router.router_id)))
+        for router in system.ruby.network.routers:
+            _set_subtree_eventq(router, queue_for_router(int(router.router_id)))
 
-    for i, cpu in enumerate(system.cpu):
-        _set_subtree_eventq(cpu, queue_for_router(router_id_for_index(i)))
+        for i, cpu in enumerate(system.cpu):
+            _set_subtree_eventq(cpu, queue_for_router(router_id_for_index(i)))
 
-    for i, ctrl in enumerate(system.ruby._cpu_ports):
-        _set_subtree_eventq(ctrl, queue_for_router(router_id_for_index(i)))
+        for i, ctrl in enumerate(system.ruby._cpu_ports):
+            _set_subtree_eventq(ctrl, queue_for_router(router_id_for_index(i)))
 
-    for i, ctrl in enumerate(l1_ctrls):
-        _set_subtree_eventq(ctrl, queue_for_router(router_id_for_index(i)))
+        for i, ctrl in enumerate(l1_ctrls):
+            _set_subtree_eventq(ctrl, queue_for_router(router_id_for_index(i)))
 
-    for i, ctrl in enumerate(dir_ctrls):
-        _set_subtree_eventq(ctrl, queue_for_router(router_id_for_index(i)))
+        for i, ctrl in enumerate(dir_ctrls):
+            _set_subtree_eventq(ctrl, queue_for_router(router_id_for_index(i)))
 
-    for i, mem_ctrl in enumerate(system.mem_ctrls):
-        _set_subtree_eventq(mem_ctrl, queue_for_router(router_id_for_index(i)))
+        for i, mem_ctrl in enumerate(system.mem_ctrls):
+            _set_subtree_eventq(mem_ctrl, queue_for_router(router_id_for_index(i)))
 
-    for i, netif in enumerate(system.ruby.network.netifs):
-        _set_subtree_eventq(netif, queue_for_router(router_id_for_index(i)))
+        for i, netif in enumerate(system.ruby.network.netifs):
+            _set_subtree_eventq(netif, queue_for_router(router_id_for_index(i)))
 
-    for i, ext_link in enumerate(system.ruby.network.ext_links):
-        _set_subtree_eventq(ext_link, queue_for_router(router_id_for_index(i)))
+        for i, ext_link in enumerate(system.ruby.network.ext_links):
+            _set_subtree_eventq(ext_link, queue_for_router(router_id_for_index(i)))
+    else:
+        router_queue = {
+            int(router.router_id): queue_for_router(int(router.router_id))
+            for router in topology.routers
+        }
+        mem_ctrls = list(getattr(system, "mem_ctrls", []))
+        netifs = list(getattr(system.ruby.network, "netifs", []))
+        ext_links = list(getattr(system.ruby.network, "ext_links", []))
+        cpu_ports = list(getattr(system.ruby, "_cpu_ports", []))
 
-    for int_link in system.ruby.network.int_links:
-        src_queue = queue_for_router(int(int_link.src_node.router_id))
-        dst_queue = queue_for_router(int(int_link.dst_node.router_id))
-        _set_subtree_eventq(int_link.network_link, src_queue)
-        _set_subtree_eventq(int_link.src_net_bridge, src_queue)
-        _set_subtree_eventq(int_link.src_cred_bridge, src_queue)
-        _set_subtree_eventq(int_link.dst_net_bridge, dst_queue)
-        _set_subtree_eventq(int_link.credit_link, dst_queue)
-        _set_subtree_eventq(int_link.dst_cred_bridge, dst_queue)
-        int_link.eventq_index = src_queue
+        for router in system.ruby.network.routers:
+            _set_subtree_eventq(router, router_queue[int(router.router_id)])
+
+        for extracted_router in topology.routers:
+            queue = router_queue[extracted_router.router_id]
+            for cpu_index in extracted_router.cpu_indices:
+                if cpu_index < len(system.cpu):
+                    _set_subtree_eventq(system.cpu[cpu_index], queue)
+            for cpu_port_index in extracted_router.cpu_port_indices:
+                if cpu_port_index < len(cpu_ports):
+                    _set_subtree_eventq(cpu_ports[cpu_port_index], queue)
+            for ext_index in extracted_router.ext_link_indices:
+                if ext_index < len(ext_links):
+                    _set_subtree_eventq(ext_links[ext_index], queue)
+                    _set_subtree_eventq(ext_links[ext_index].ext_node, queue)
+            for netif_index in extracted_router.netif_indices:
+                if netif_index < len(netifs):
+                    _set_subtree_eventq(netifs[netif_index], queue)
+            for mem_index in extracted_router.mem_ctrl_indices:
+                if mem_index < len(mem_ctrls):
+                    _set_subtree_eventq(mem_ctrls[mem_index], queue)
+
+        for int_link in system.ruby.network.int_links:
+            src_queue = router_queue[int(int_link.src_node.router_id)]
+            dst_queue = router_queue[int(int_link.dst_node.router_id)]
+            _set_subtree_eventq(int_link.network_link, src_queue)
+            _set_subtree_eventq(int_link.src_net_bridge, src_queue)
+            _set_subtree_eventq(int_link.src_cred_bridge, src_queue)
+            _set_subtree_eventq(int_link.dst_net_bridge, dst_queue)
+            _set_subtree_eventq(int_link.credit_link, dst_queue)
+            _set_subtree_eventq(int_link.dst_cred_bridge, dst_queue)
+            int_link.eventq_index = src_queue
 
     root.sim_quantum = 1
     m5.activateParallelNetworkAcceleration(len(system.ruby.network.routers))
@@ -225,19 +306,34 @@ def configure_network_accel(
     topology = None
     runtime_workers = 1
     if requested_mode == "parallel":
-        runtime_workers = _resolve_parallel_workers(
-            len(system.ruby.network.routers),
-            requested_workers,
-            max_workers,
-        )
+        worker_cap = _resolve_worker_cap(requested_workers, max_workers)
         if partitioner == "topology_auto":
             try:
                 topology = extract_topology(system)
             except TopologyExtractionError as error:
-                raise RuntimeError(
-                    "topology_auto partitioner could not extract a deterministic "
-                    f"Ruby/Garnet ownership graph: {error}"
-                ) from error
+                topology = None
+            if topology is not None:
+                selection = build_topology_auto_partition_plan(
+                    topology,
+                    requested_shape=auto_shape,
+                    worker_cap=worker_cap,
+                )
+                runtime_workers = selection.plan.partition_count
+            else:
+                runtime_workers = min(
+                    worker_cap,
+                    len(system.ruby.network.routers),
+                )
+                selection = PartitionStrategyResult(
+                    plan=_build_router_chunks_partition_plan(
+                        [int(router.router_id) for router in _sorted_routers(system)],
+                        runtime_workers,
+                    ),
+                    strategy="router_chunks",
+                    reason="topology_extraction_failed",
+                )
+        else:
+            runtime_workers = min(worker_cap, len(system.ruby.network.routers))
     elif requested_workers != _AUTO_WORKERS:
         runtime_workers = requested_workers
 
@@ -245,25 +341,34 @@ def configure_network_accel(
     if requested_mode != "parallel":
         return None
 
-    fallback_reason = (
-        "as_requested"
-        if partitioner == "manual"
-        else "surface_only_manual_fallback"
-    )
+    if partitioner == "manual":
+        selection = PartitionStrategyResult(
+            plan=_build_manual_partition_plan(
+                system,
+                effective_workers=runtime_workers,
+            ),
+            strategy="manual",
+            reason="as_requested",
+        )
+    elif topology is None:
+        selection = PartitionStrategyResult(
+            plan=_build_router_chunks_partition_plan(
+                [int(router.router_id) for router in _sorted_routers(system)],
+                runtime_workers,
+            ),
+            strategy="router_chunks",
+            reason="topology_extraction_failed",
+        )
 
-    plan = _build_manual_partition_plan(
-        system,
-        effective_workers=runtime_workers,
-    )
-    _apply_partition_plan(root, system, plan)
+    _apply_partition_plan(root, system, selection.plan, topology=topology)
     return summarize_partition_plan(
-        plan,
+        selection.plan,
         requested_partitioner=partitioner,
-        strategy="manual",
+        strategy=selection.strategy,
         auto_shape=auto_shape,
         requested_workers=str(requested_workers),
         effective_workers=runtime_workers,
-        reason=fallback_reason,
+        reason=selection.reason,
         topology=topology,
     )
 
