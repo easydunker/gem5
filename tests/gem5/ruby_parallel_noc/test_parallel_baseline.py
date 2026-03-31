@@ -60,8 +60,24 @@ gem5_verify_config(
         ),
         NamedMatchRegex(
             "parallel-noc-partition-line",
-            r"^PARALLEL_NOC_PARTITION partitions=4 queues=1,2,3 "
+            r"^PARALLEL_NOC_PARTITION partitions=3 queues=1,2,3 "
             r"sim_quantum=1$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partitioner-line",
+            r"^PARALLEL_NOC_PARTITIONER requested=manual strategy=manual "
+            r"reason=as_requested auto_shape=mesh_blocks "
+            r"requested_workers=3 effective_workers=3 routers=4 "
+            r"partitions=3$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-partition-map-line",
+            r"^PARALLEL_NOC_PARTITION_MAP queues=1:\[0,3\];2:\[1\];3:\[2\]$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-runtime-line",
+            r"^PARALLEL_NOC_RUNTIME entered=0:1,1:1,2:1,3:1 "
+            r"dispatches=0:\d+,1:\d+,2:\d+,3:\d+$",
         ),
         NamedMatchRegex(
             "parallel-noc-output-summary",

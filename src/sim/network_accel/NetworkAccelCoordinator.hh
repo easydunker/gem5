@@ -1,6 +1,7 @@
 #ifndef __SIM_NETWORK_ACCEL_NETWORK_ACCEL_COORDINATOR_HH__
 #define __SIM_NETWORK_ACCEL_NETWORK_ACCEL_COORDINATOR_HH__
 
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -34,6 +35,8 @@ class NetworkAccelCoordinator
     const std::string &note() const;
     uint32_t parallelPartitions() const;
     std::string queueSummary() const;
+    std::string activeQueueSummary() const;
+    std::string dispatchSummary() const;
     bool serialBatchingEnabled() const;
     uint32_t dispatchBatchLimit() const;
 
@@ -50,6 +53,9 @@ class NetworkAccelCoordinator
     NetworkAccelConfig _config;
     std::string _note;
     uint32_t _parallelPartitions = 0;
+    uint32_t _runtimeQueueCount = 0;
+    std::unique_ptr<std::atomic<uint64_t>[]> _queueEnterCounts;
+    std::unique_ptr<std::atomic<uint64_t>[]> _dispatchCounts;
     std::unique_ptr<WorkerPool> _workerPool;
 };
 

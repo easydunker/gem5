@@ -81,7 +81,7 @@ def add_auto_partitioner_suite(
             ),
             NamedMatchRegex(
                 "parallel-noc-partition-line",
-                rf"^PARALLEL_NOC_PARTITION partitions=4 "
+                rf"^PARALLEL_NOC_PARTITION partitions={partition_count} "
                 rf"queues={queue_summary} sim_quantum=1$",
             ),
             NamedMatchRegex(

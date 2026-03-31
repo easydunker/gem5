@@ -60,7 +60,7 @@ gem5_verify_config(
         ),
         NamedMatchRegex(
             "parallel-noc-partition-line",
-            r"^PARALLEL_NOC_PARTITION partitions=8 queues=1,2 "
+            r"^PARALLEL_NOC_PARTITION partitions=2 queues=1,2 "
             r"sim_quantum=1$",
         ),
         NamedMatchRegex(
@@ -149,7 +149,7 @@ gem5_verify_config(
         ),
         NamedMatchRegex(
             "parallel-noc-partition-line",
-            r"^PARALLEL_NOC_PARTITION partitions=8 queues=1,2 "
+            r"^PARALLEL_NOC_PARTITION partitions=2 queues=1,2 "
             r"sim_quantum=1$",
         ),
         NamedMatchRegex(

@@ -301,7 +301,7 @@ def _apply_partition_plan(root, system, plan, topology=None):
             int_link.eventq_index = src_queue
 
     root.sim_quantum = 1
-    m5.activateParallelNetworkAcceleration(len(system.ruby.network.routers))
+    m5.activateParallelNetworkAcceleration(plan.partition_count)
 
 
 def configure_network_accel(
@@ -315,9 +315,11 @@ def configure_network_accel(
     max_workers=None,
 ):
     topology = None
-    runtime_workers = 1
+    requested_runtime_workers = 1
+    effective_workers = 1
     if requested_mode == "parallel":
         worker_cap = _resolve_worker_cap(requested_workers, max_workers)
+        requested_runtime_workers = worker_cap
         if partitioner == "topology_auto":
             try:
                 topology = extract_topology(system)
@@ -331,13 +333,15 @@ def configure_network_accel(
                 requested_shape=auto_shape,
                 worker_cap=worker_cap,
             )
-            runtime_workers = selection.plan.partition_count
+            effective_workers = selection.plan.partition_count
         else:
-            runtime_workers = min(worker_cap, len(system.ruby.network.routers))
+            effective_workers = min(
+                worker_cap, len(system.ruby.network.routers)
+            )
     elif requested_workers != _AUTO_WORKERS:
-        runtime_workers = requested_workers
+        requested_runtime_workers = requested_workers
 
-    m5.setNetworkAcceleration(requested_mode, runtime_workers)
+    m5.setNetworkAcceleration(requested_mode, requested_runtime_workers)
     if requested_mode != "parallel":
         return None
 
@@ -345,7 +349,7 @@ def configure_network_accel(
         selection = PartitionStrategyResult(
             plan=_build_manual_partition_plan(
                 system,
-                effective_workers=runtime_workers,
+                effective_workers=effective_workers,
             ),
             strategy="manual",
             reason="as_requested",
@@ -358,7 +362,7 @@ def configure_network_accel(
         strategy=selection.strategy,
         auto_shape=auto_shape,
         requested_workers=str(requested_workers),
-        effective_workers=runtime_workers,
+        effective_workers=selection.plan.partition_count,
         reason=selection.reason,
         topology=topology,
     )

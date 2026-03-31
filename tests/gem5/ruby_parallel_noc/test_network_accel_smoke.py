@@ -45,21 +45,35 @@ class NamedStatsFileExists(verifier.Verifier):
             test_util.fail(f"Could not find expected stats file: {stats_path}")
 
 
-def add_smoke_suite(name, mode, workers):
+def add_smoke_suite(
+    name,
+    mode,
+    workers,
+    *,
+    expected_workers=None,
+    expected_partition_count=None,
+    note_regex=None,
+):
     effective_mode = mode
-    effective_workers = workers
-    note_regex = None
+    effective_workers = expected_workers or workers
     partition_regex = None
     if mode == "parallel":
         partition_regex = (
-            r"^PARALLEL_NOC_PARTITION partitions=4 queues=1,2,3 "
+            rf"^PARALLEL_NOC_PARTITION partitions={expected_partition_count} "
+            rf"queues={','.join(str(queue) for queue in range(1, effective_workers + 1))} "
             r"sim_quantum=1$"
+        )
+        runtime_regex = (
+            rf"^PARALLEL_NOC_RUNTIME "
+            rf"entered={','.join(f'{queue}:1' for queue in range(0, effective_workers + 1))} "
+            rf"dispatches={','.join(f'{queue}:\\d+' for queue in range(0, effective_workers + 1))}$"
         )
         metric_regex = (
             r"^PARALLEL_NOC_METRIC tick=2000 exit_tick=2001 cause=Network "
             r"Tester completed simCycles$"
         )
     else:
+        runtime_regex = None
         metric_regex = (
             r"^PARALLEL_NOC_METRIC tick=2000 exit_tick=2000 cause=Network "
             r"Tester completed simCycles$"
@@ -84,6 +98,10 @@ def add_smoke_suite(name, mode, workers):
     if partition_regex:
         verifiers.append(
             NamedMatchRegex("parallel-noc-partition-line", partition_regex)
+        )
+    if runtime_regex:
+        verifiers.append(
+            NamedMatchRegex("parallel-noc-runtime-line", runtime_regex)
         )
     verifiers.extend(
         [
@@ -152,4 +170,17 @@ add_smoke_suite(
     name="ruby-parallel-noc-parallel-smoke",
     mode="parallel",
     workers=3,
+    expected_partition_count=3,
+)
+add_smoke_suite(
+    name="ruby-parallel-noc-parallel-downgrade-smoke",
+    mode="parallel",
+    workers=8,
+    expected_workers=4,
+    expected_partition_count=4,
+    note_regex=(
+        r"^PARALLEL_NOC_NOTE requested_mode=parallel requested_workers=8 "
+        r"effective_mode=parallel effective_workers=4 "
+        r"reason=parallel mode reduced worker count to 4 for 4 partitions$"
+    ),
 )

@@ -113,6 +113,18 @@ sim_pybind(pybind11::module_ &m_internal)
             return NetworkAccelCoordinator::instance().queueSummary();
         }
     );
+    m.def(
+        "get_network_accel_active_queue_summary",
+        []() {
+            return NetworkAccelCoordinator::instance().activeQueueSummary();
+        }
+    );
+    m.def(
+        "get_network_accel_dispatch_summary",
+        []() {
+            return NetworkAccelCoordinator::instance().dispatchSummary();
+        }
+    );
 }
 EmbeddedPyBind embed_("sim", &sim_pybind);
 

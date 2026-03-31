@@ -61,7 +61,7 @@ def add_large_mesh_suite(name, auto_shape, strategy, reason, partition_map):
             ),
             NamedMatchRegex(
                 "parallel-noc-partition-line",
-                r"^PARALLEL_NOC_PARTITION partitions=16 queues=1,2,3,4 "
+                r"^PARALLEL_NOC_PARTITION partitions=4 queues=1,2,3,4 "
                 r"sim_quantum=1$",
             ),
             NamedMatchRegex(

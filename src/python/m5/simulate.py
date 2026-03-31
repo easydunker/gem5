@@ -289,6 +289,14 @@ def getNetworkAccelerationQueueSummary() -> str:
     return _m5_sim.get_network_accel_queue_summary()
 
 
+def getNetworkAccelerationActiveQueueSummary() -> str:
+    return _m5_sim.get_network_accel_active_queue_summary()
+
+
+def getNetworkAccelerationDispatchSummary() -> str:
+    return _m5_sim.get_network_accel_dispatch_summary()
+
+
 def simulate(*args, **kwargs):
     global need_startup
     global _instantiated

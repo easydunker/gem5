@@ -603,11 +603,11 @@ git commit -m "feat(noc): add topology-aware smart partitioning"
 - Modify: `tests/gem5/ruby_parallel_noc/test_parallel_baseline.py`
 - Modify: `tests/gem5/ruby_parallel_noc/test_network_accel_smoke.py`
 
-- [ ] **Step 1: Keep C++ as validation/reporting only**
+- [x] **Step 1: Keep C++ as validation/reporting only**
 
 Do not re-implement topology analysis in C++.
 
-- [ ] **Step 2: Add any missing runtime-facing summary accessors**
+- [x] **Step 2: Add any missing runtime-facing summary accessors**
 
 Needed fields may include:
 
@@ -617,7 +617,7 @@ Needed fields may include:
 - downgrade reason,
 - active queue/dispatch summaries.
 
-- [ ] **Step 3: Tighten runtime assertions**
+- [x] **Step 3: Tighten runtime assertions**
 
 Fail fast if:
 
@@ -625,11 +625,11 @@ Fail fast if:
 - active queues do not match the chosen worker set,
 - any claimed worker queue never enters or never dispatches.
 
-- [ ] **Step 4: Extend focused tests to check new summary fields**
+- [x] **Step 4: Extend focused tests to check new summary fields**
 
 Do not just check "run succeeded." Check the report surface.
 
-- [ ] **Step 5: Run repeated deterministic validation**
+- [x] **Step 5: Run repeated deterministic validation**
 
 Repeat the same direct `parallel` run three times and confirm:
 
@@ -638,7 +638,7 @@ Repeat the same direct `parallel` run three times and confirm:
 - same `system.ruby.network.*` stats,
 - same queue activity pattern shape.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/sim/network_accel/NetworkAccelCoordinator.hh \
@@ -654,10 +654,10 @@ git commit -m "feat(noc): validate and report smart partitioner runtime state"
 
 **Checklist (Chunk 4)**
 
-- [ ] Runtime still owns validation, not planning.
-- [ ] `parallel` claims are provable from runtime counters.
-- [ ] Repeated runs are deterministic.
-- [ ] No Garnet internals were modified.
+- [x] Runtime still owns validation, not planning.
+- [x] `parallel` claims are provable from runtime counters.
+- [x] Repeated runs are deterministic.
+- [x] No Garnet internals were modified.
 
 ---
 
