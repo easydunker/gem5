@@ -26,6 +26,27 @@ more information about building the simulator and getting started
 please see <http://www.gem5.org/documentation> and
 <http://www.gem5.org/documentation/learning_gem5/introduction>.
 
+## Docker quickstart
+
+The canonical container image is `ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest`.
+
+```sh
+docker pull ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  scons -j2 build/ALL/gem5.opt
+```
+
+For `tests/main.py`, also mount `/tmp` and run from `/workspace/tests`.
+On Apple Silicon with Docker Desktop, keep `-j2` or lower unless you have
+measured higher parallelism on your machine.
+
+To validate the canonical image locally, use
+`util/dockerfiles/validate_ubuntu_24_04_all_dependencies.sh`.
+
 ## Building gem5
 
 To build gem5, you will need the following software: g++ or clang,

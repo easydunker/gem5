@@ -26,6 +26,18 @@ class NamedMatchRegex(verifier.MatchRegex):
         )
 
 
+class NamedNoMatchRegex(verifier.NoMatchRegex):
+    def __init__(self, test_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._test_name = test_name
+
+    def instantiate_test(self, name_pfx):
+        name = "-".join([name_pfx, self._test_name])
+        return test_util.TestFunction(
+            self._test, name=name, fixtures=self.fixtures
+        )
+
+
 class NamedStatsFileExists(verifier.Verifier):
     def __init__(self, test_name, filename="stats.txt"):
         super().__init__()
@@ -55,6 +67,8 @@ def add_auto_partitioner_suite(
     effective_workers,
     partition_count,
     partition_map,
+    report_partitions=True,
+    note_regex=None,
 ):
     queue_summary = ",".join(
         str(queue) for queue in range(1, effective_workers + 1)
@@ -65,71 +79,88 @@ def add_auto_partitioner_suite(
     dispatch_summary = ",".join(
         f"{queue}:\\d+" for queue in range(0, effective_workers + 1)
     )
-    gem5_verify_config(
-        name=name,
-        fixtures=(),
-        verifiers=(
-            NamedMatchRegex(
-                "parallel-noc-mode-line",
-                rf"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
-                rf"WORKERS={effective_workers} NUM_CPUS=4$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-coordinator-line",
-                rf"^PARALLEL_NOC_COORDINATOR mode=parallel "
-                rf"workers={effective_workers}$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-partition-line",
-                rf"^PARALLEL_NOC_PARTITION partitions={partition_count} "
-                rf"queues={queue_summary} sim_quantum=1$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-partitioner-line",
-                rf"^PARALLEL_NOC_PARTITIONER requested={partitioner} "
-                rf"strategy={strategy} "
-                rf"reason={reason} "
-                rf"auto_shape={auto_shape} requested_workers={workers} "
-                rf"effective_workers={effective_workers} "
-                rf"routers=4 partitions={partition_count}$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-partition-map-line",
-                rf"^PARALLEL_NOC_PARTITION_MAP queues={partition_map}$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-runtime-line",
-                rf"^PARALLEL_NOC_RUNTIME entered={active_queue_summary} "
-                rf"dispatches={dispatch_summary}$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-metric-line",
-                r"^PARALLEL_NOC_METRIC tick=2000 exit_tick=2001 cause=Network "
-                r"Tester completed simCycles$",
-            ),
-            NamedMatchRegex(
-                "parallel-noc-stats-line",
-                r"^PARALLEL_NOC_STATS path=.*[/\\]stats\.txt exists=True$",
-            ),
-            NamedStatsFileExists("parallel-noc-stats-file-exists"),
+    verifiers = [
+        NamedMatchRegex(
+            "parallel-noc-mode-line",
+            rf"^PARALLEL_NOC_MODE=parallel REQUESTED=parallel "
+            rf"WORKERS={effective_workers} NUM_CPUS=4$",
         ),
-        config=joinpath(
-            config.base_dir,
-            "tests",
-            "gem5",
-            "ruby_parallel_noc",
-            "configs",
-            "ruby_garnet_equiv.py",
+        NamedMatchRegex(
+            "parallel-noc-coordinator-line",
+            rf"^PARALLEL_NOC_COORDINATOR mode=parallel "
+            rf"workers={effective_workers}$",
         ),
-        config_args=[
-            "--network-accel-mode",
-            "parallel",
-            "--network-accel-workers",
-            str(workers),
-            "--network-accel-partitioner",
-            partitioner,
-            "--network-accel-auto-shape",
-            auto_shape,
+        NamedMatchRegex(
+            "parallel-noc-partition-line",
+            rf"^PARALLEL_NOC_PARTITION partitions={partition_count} "
+            rf"queues={queue_summary} sim_quantum=1$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-runtime-line",
+            rf"^PARALLEL_NOC_RUNTIME entered={active_queue_summary} "
+            rf"dispatches={dispatch_summary}$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-metric-line",
+            r"^PARALLEL_NOC_METRIC tick=2000 exit_tick=2001 cause=Network "
+            r"Tester completed simCycles$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-stats-line",
+            r"^PARALLEL_NOC_STATS path=.*[/\\]stats\.txt exists=True$",
+        ),
+        NamedStatsFileExists("parallel-noc-stats-file-exists"),
+    ]
+    if note_regex:
+        verifiers.append(
+            NamedMatchRegex("parallel-noc-note-line", note_regex)
+        )
+    if report_partitions:
+        verifiers.extend(
+            [
+                NamedMatchRegex(
+                    "parallel-noc-partitioner-line",
+                    rf"^PARALLEL_NOC_PARTITIONER requested={partitioner} "
+                    rf"strategy={strategy} "
+                    rf"reason={reason} "
+                    rf"auto_shape={auto_shape} requested_workers={workers} "
+                    rf"effective_workers={effective_workers} "
+                    rf"routers=4 partitions={partition_count}$",
+                ),
+                NamedMatchRegex(
+                    "parallel-noc-partition-map-line",
+                    rf"^PARALLEL_NOC_PARTITION_MAP queues={partition_map}$",
+                ),
+            ]
+        )
+    else:
+        verifiers.extend(
+            [
+                NamedNoMatchRegex(
+                    "parallel-noc-partitioner-line-absent",
+                    r"^PARALLEL_NOC_PARTITIONER ",
+                ),
+                NamedNoMatchRegex(
+                    "parallel-noc-partition-map-line-absent",
+                    r"^PARALLEL_NOC_PARTITION_MAP ",
+                ),
+            ]
+        )
+
+    config_args = [
+        "--network-accel-mode",
+        "parallel",
+        "--network-accel-workers",
+        str(workers),
+        "--network-accel-partitioner",
+        partitioner,
+        "--network-accel-auto-shape",
+        auto_shape,
+    ]
+    if not report_partitions:
+        config_args.append("--no-network-accel-report-partitions")
+    config_args.extend(
+        [
             "--network",
             "garnet",
             "--topology",
@@ -148,7 +179,22 @@ def add_auto_partitioner_suite(
             "0.02",
             "--routing-algorithm",
             "1",
-        ],
+        ]
+    )
+
+    gem5_verify_config(
+        name=name,
+        fixtures=(),
+        verifiers=tuple(verifiers),
+        config=joinpath(
+            config.base_dir,
+            "tests",
+            "gem5",
+            "ruby_parallel_noc",
+            "configs",
+            "ruby_garnet_equiv.py",
+        ),
+        config_args=config_args,
         valid_isas=(constants.null_tag,),
         valid_hosts=constants.supported_hosts,
         length=constants.quick_tag,
@@ -179,4 +225,34 @@ add_auto_partitioner_suite(
     effective_workers=2,
     partition_count=2,
     partition_map=r"1:\[0,1\];2:\[2,3\]",
+)
+
+add_auto_partitioner_suite(
+    name="ruby-parallel-noc-topology-auto-partitioner-no-report-smoke",
+    partitioner="topology_auto",
+    strategy="mesh_strips",
+    reason="mesh_xy_strips",
+    workers="auto",
+    auto_shape="mesh_strips",
+    effective_workers=2,
+    partition_count=2,
+    partition_map=r"1:\[0,1\];2:\[2,3\]",
+    report_partitions=False,
+)
+
+add_auto_partitioner_suite(
+    name="ruby-parallel-noc-topology-auto-partitioner-downgrade-smoke",
+    partitioner="topology_auto",
+    strategy="mesh_blocks",
+    reason="mesh_xy_rectangular",
+    workers=8,
+    auto_shape="mesh_blocks",
+    effective_workers=2,
+    partition_count=2,
+    partition_map=r"1:\[0,1\];2:\[2,3\]",
+    note_regex=(
+        r"^PARALLEL_NOC_NOTE requested_mode=parallel requested_workers=8 "
+        r"effective_mode=parallel effective_workers=2 "
+        r"reason=parallel mode reduced worker count to 2 for 2 partitions$"
+    ),
 )

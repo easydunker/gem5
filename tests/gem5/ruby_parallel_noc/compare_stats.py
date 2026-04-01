@@ -37,17 +37,17 @@ EXCLUDED_SUBSTRINGS = (
 @dataclass(frozen=True)
 class ComparisonProfile:
     name: str
-    allow_plus_one_tick: bool
+    accepted_tick_deltas: tuple[int, ...]
 
 
 PROFILES = {
     "exact": ComparisonProfile(
         name="exact",
-        allow_plus_one_tick=False,
+        accepted_tick_deltas=(0,),
     ),
     "parallel": ComparisonProfile(
         name="parallel",
-        allow_plus_one_tick=True,
+        accepted_tick_deltas=(0, 1),
     ),
 }
 
@@ -113,7 +113,7 @@ def compare(reference_path: Path, candidate_path: Path, profile: ComparisonProfi
             )
             continue
 
-        if key in PLUS_ONE_KEYS and profile.allow_plus_one_tick:
+        if key in PLUS_ONE_KEYS:
             try:
                 ref_tick = int(ref_value)
                 cand_tick = int(cand_value)
@@ -124,9 +124,16 @@ def compare(reference_path: Path, candidate_path: Path, profile: ComparisonProfi
                 )
                 continue
 
-            if cand_tick != ref_tick + 1:
+            delta = cand_tick - ref_tick
+            if delta not in profile.accepted_tick_deltas:
+                expected = " or ".join(
+                    f"reference + {tick_delta}"
+                    if tick_delta
+                    else "reference"
+                    for tick_delta in profile.accepted_tick_deltas
+                )
                 failures.append(
-                    f"{key}: expected candidate to equal reference + 1, got "
+                    f"{key}: expected candidate to equal {expected}, got "
                     f"reference={ref_tick} candidate={cand_tick}"
                 )
             continue

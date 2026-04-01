@@ -358,7 +358,7 @@ def build_topology_auto_partition_plan(
         elif requested_shape == "router_chunks":
             return build_router_chunks_plan(topology, partition_count)
 
-    if _connected(topology):
+    if requested_shape == "graph_bfs":
         try:
             return build_graph_bfs_plan(topology, partition_count)
         except PartitionStrategyError:

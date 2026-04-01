@@ -66,9 +66,15 @@ gem5_verify_config(
         NamedMatchRegex(
             "parallel-noc-partitioner-line",
             r"^PARALLEL_NOC_PARTITIONER requested=topology_auto "
-            r"strategy=graph_bfs reason=graph_connected "
-            r"auto_shape=graph_bfs requested_workers=auto "
+            r"strategy=router_chunks reason=conservative_router_chunks "
+            r"auto_shape=mesh_blocks requested_workers=auto "
             r"effective_workers=2 routers=8 partitions=2$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-note-line",
+            r"^PARALLEL_NOC_NOTE requested=topology_auto "
+            r"auto_shape=mesh_blocks fallback=router_chunks "
+            r"reason=non_mesh_topology$",
         ),
         NamedMatchRegex(
             "parallel-noc-partition-map-line",
@@ -108,7 +114,7 @@ gem5_verify_config(
         "--network-accel-partitioner",
         "topology_auto",
         "--network-accel-auto-shape",
-        "graph_bfs",
+        "mesh_blocks",
         "--network-accel-report-partitions",
         "--network",
         "garnet",
@@ -155,9 +161,15 @@ gem5_verify_config(
         NamedMatchRegex(
             "parallel-noc-partitioner-line",
             r"^PARALLEL_NOC_PARTITIONER requested=topology_auto "
-            r"strategy=graph_bfs reason=graph_connected "
-            r"auto_shape=router_chunks requested_workers=auto "
+            r"strategy=router_chunks reason=conservative_router_chunks "
+            r"auto_shape=mesh_strips requested_workers=auto "
             r"effective_workers=2 routers=8 partitions=2$",
+        ),
+        NamedMatchRegex(
+            "parallel-noc-note-line",
+            r"^PARALLEL_NOC_NOTE requested=topology_auto "
+            r"auto_shape=mesh_strips fallback=router_chunks "
+            r"reason=non_mesh_topology$",
         ),
         NamedMatchRegex(
             "parallel-noc-partition-map-line",
@@ -197,7 +209,7 @@ gem5_verify_config(
         "--network-accel-partitioner",
         "topology_auto",
         "--network-accel-auto-shape",
-        "router_chunks",
+        "mesh_strips",
         "--network-accel-report-partitions",
         "--network",
         "garnet",

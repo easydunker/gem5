@@ -139,8 +139,9 @@ def main():
             f"queues={m5.getNetworkAccelerationQueueSummary()} "
             f"sim_quantum={root.sim_quantum}"
         )
-        for line in format_partition_summary_lines(partition_summary):
-            print(line)
+        if args.network_accel_report_partitions and partition_summary:
+            for line in format_partition_summary_lines(partition_summary):
+                print(line)
     if m5.networkAccelerationDowngraded():
         print(
             "PARALLEL_NOC_NOTE "

@@ -89,7 +89,8 @@ def add_network_accel_options(parser):
     parser.add_argument(
         "--network-accel-report-partitions",
         dest="network_accel_report_partitions",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Print compact partitioner summary lines.",
     )
 

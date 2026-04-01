@@ -2,6 +2,12 @@
 
 This directory contains the Dockerfiles used to build the gem5 Docker images.
 The Docker images are used to run gem5 in a containerized environment.
+The canonical general-purpose image is `ubuntu-24.04_all-dependencies`.
+Specialized images such as `gcn-gpu`, `sst-env` (`sst` bake target), and
+`systemc-env` (`systemc` bake target) are kept for their specific workflows.
+The `devcontainer` image is optional and is not the canonical mounted-checkout
+image because it includes a prebuilt released `gem5` binary for convenience
+instead of tracking the source tree mounted into `/workspace`.
 
 ## The Docker Registry
 
@@ -14,7 +20,7 @@ You can pull the gem5 Docker images using the following command:
 
 ```sh
 # Example: Pulling the gem5 Ubuntu 24.04 image with all dependencies
-docker pull ghcr.io/gem5/gem5/ubuntu-24.04_all-dependencies:latest
+docker pull ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest
 ```
 
 ## Building the Docker Images
@@ -41,7 +47,7 @@ For other systems, you can refer to the QEMU documentation to install the system
 To create a buildx builder with the QEMU emulators you can use the following command:
 
 ```sh
-docker buildx create --name mybuilder --bootstrap --use --platform linux/aarch64,linux/amd64,linux/riscv64
+docker buildx create --name mybuilder --bootstrap --use --platform linux/arm64,linux/amd64,linux/riscv64
 ```
 
 This creates a buildx builder named `mybuilder` with the specified platforms then and sets it as the active builder.
@@ -54,19 +60,27 @@ These can be passed to the buildx command to build that target image or group of
 For example, the following will build the "ubuntu-24.04_all-dependencies" image:
 
 ```sh
-docker buildx bake ubuntu-24-04_all-dependencies
+docker buildx bake -f util/dockerfiles/docker-bake.hcl ubuntu-24-04_all-dependencies
 ```
 
 And the following will build all the gcc-compiler images:
 
 ```sh
-docker buildx bake gcc-compiler
+docker buildx bake -f util/dockerfiles/docker-bake.hcl gcc-compilers
 ```
 
 If no target is specified all the images will be built.
 
 ```sh
-docker buildx bake
+docker buildx bake -f util/dockerfiles/docker-bake.hcl
+```
+
+## Local validation
+
+To validate the canonical image locally from a mounted checkout, run:
+
+```sh
+bash util/dockerfiles/validate_ubuntu_24_04_all_dependencies.sh
 ```
 
 ## Pushing the Docker Images
@@ -74,7 +88,7 @@ docker buildx bake
 To push the Docker images to the Github Container Registry, you can use the following command:
 
 ```sh
-docker buildx bake <target/group> --push
+docker buildx bake -f util/dockerfiles/docker-bake.hcl <target/group> --push
 ```
 
 However, you need to authenticate with the Github Container Registry, creating a token with write access to the gem5 GitHub Docker registry.
@@ -91,6 +105,6 @@ echo $GITHUB_PAT | docker login ghcr.io -u $GITHUB_USERNAME --password-stdin
 
 ## gem5 Docker Tags
 
-As is standard with Docker images, latest image created for each Dockerfile is tagged as `latest`.
+As is standard with Docker images, the latest image created for each Dockerfile is tagged as `latest`.
 
-When a new major release of gem5 is created the Docker images compatible with that release are tagged with the gem5 version. For example, the images compatible with gem5 v23.1.0.0 are tagged as `v23-0`: `ghcr.io/gem5/gem5/ubuntu-24.04_all-dependencies:v23-0`.
+When a new major release of gem5 is created the Docker images compatible with that release are tagged with the gem5 version. For example, the images compatible with gem5 v23.1.0.0 are tagged as `v23-0`: `ghcr.io/gem5/ubuntu-24.04_all-dependencies:v23-0`.

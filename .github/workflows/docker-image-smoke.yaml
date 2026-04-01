@@ -1,0 +1,21 @@
+---
+name: Docker Image Smoke Coverage
+
+on:
+    pull_request:
+        paths:
+            - util/dockerfiles/**
+            - README.md
+            - .github/workflows/docker-image-smoke.yaml
+
+jobs:
+    docker-image-smoke:
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Validate ubuntu-24.04 all dependencies image
+              run: bash util/dockerfiles/validate_ubuntu_24_04_all_dependencies.sh

@@ -36,6 +36,30 @@ Run from repo root. Use the same-source `build/Garnet_standalone/gem5.opt`
 binary for direct workload validation and mount `/tmp` to avoid container tmp
 exhaustion during test runs.
 
+Build the direct-run binary and capture the log:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  bash -lc 'scons build/Garnet_standalone/gem5.opt -j2 2>&1' \
+  | tee /tmp/ruby_parallel_noc_garnet_standalone_build.log
+```
+
+Build the harness binary and capture the log:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  bash -lc 'scons build/NULL_Garnet_standalone/gem5.opt -j2 2>&1' \
+  | tee /tmp/ruby_parallel_noc_null_garnet_build.log
+```
+
 Direct `off` run:
 
 ```bash
@@ -114,6 +138,58 @@ docker run --rm \
       --routing-algorithm 1'
 ```
 
+Direct `parallel + topology_auto` run:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -v /tmp:/tmp \
+  -w /workspace \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  bash -lc 'rm -rf /tmp/ruby_parallel_noc_parallel_auto && mkdir -p /tmp/ruby_parallel_noc_parallel_auto && \
+    /workspace/build/Garnet_standalone/gem5.opt \
+      --outdir=/tmp/ruby_parallel_noc_parallel_auto \
+      /workspace/tests/gem5/ruby_parallel_noc/configs/ruby_garnet_equiv.py \
+      --network-accel-mode parallel \
+      --network-accel-workers 3 \
+      --network-accel-partitioner topology_auto \
+      --network-accel-auto-shape mesh_blocks \
+      --network garnet \
+      --topology Mesh_XY \
+      --num-cpus 4 \
+      --num-dirs 4 \
+      --mesh-rows 2 \
+      --sim-cycles 2000 \
+      --synthetic uniform_random \
+      --injectionrate 0.02 \
+      --routing-algorithm 1'
+```
+
+Existing example baseline run:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -v /tmp:/tmp \
+  -w /workspace \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  bash -lc 'rm -rf /tmp/garnet_synth_smoke && mkdir -p /tmp/garnet_synth_smoke && \
+    /workspace/build/Garnet_standalone/gem5.opt \
+      --outdir=/tmp/garnet_synth_smoke \
+      /workspace/configs/example/garnet_synth_traffic.py \
+      --network garnet \
+      --topology Mesh_XY \
+      --num-cpus 4 \
+      --num-dirs 4 \
+      --mesh-rows 2 \
+      --sim-cycles 2000 \
+      --synthetic uniform_random \
+      --injectionrate 0.02 \
+      --routing-algorithm 1'
+```
+
 Stats comparison:
 
 ```bash
@@ -138,6 +214,17 @@ docker run --rm \
     --profile parallel \
     --reference /tmp/ruby_parallel_noc_serial/stats.txt \
     --candidate /tmp/ruby_parallel_noc_parallel/stats.txt
+
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -v /tmp:/tmp \
+  -w /workspace \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  python3 tests/gem5/ruby_parallel_noc/compare_stats.py \
+    --profile parallel \
+    --reference /tmp/ruby_parallel_noc_parallel/stats.txt \
+    --candidate /tmp/ruby_parallel_noc_parallel_auto/stats.txt
 ```
 
 Harness suite discovery:
@@ -162,6 +249,15 @@ docker run --rm \
   -w /workspace/tests \
   ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
   ./main.py run -vv --skip-build --uid \
+    'SuiteUID:tests/gem5/ruby_parallel_noc/test_equivalence.py:ruby-parallel-noc-baseline-off-NULL-aarch64-opt-Garnet_standalone'
+
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -v /tmp:/tmp \
+  -w /workspace/tests \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  ./main.py run -vv --skip-build --uid \
     'SuiteUID:tests/gem5/ruby_parallel_noc/test_serial_batched_baseline.py:ruby-parallel-noc-serial-batched-baseline-NULL-aarch64-opt-Garnet_standalone'
 
 docker run --rm \
@@ -172,6 +268,44 @@ docker run --rm \
   ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
   ./main.py run -vv --skip-build --uid \
     'SuiteUID:tests/gem5/ruby_parallel_noc/test_parallel_baseline.py:ruby-parallel-noc-parallel-baseline-NULL-aarch64-opt-Garnet_standalone'
+
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v "$PWD":/workspace \
+  -v /tmp:/tmp \
+  -w /workspace/tests \
+  ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+  ./main.py run -vv --skip-build --uid \
+    'SuiteUID:tests/gem5/ruby_parallel_noc/test_auto_partitioner_baseline.py:ruby-parallel-noc-auto-partitioner-baseline-NULL-aarch64-opt-Garnet_standalone'
+```
+
+Repeated deterministic `parallel` validation:
+
+```bash
+for run in 0 1 2; do
+  docker run --rm \
+    -u $(id -u):$(id -g) \
+    -v "$PWD":/workspace \
+    -v /tmp:/tmp \
+    -w /workspace \
+    ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest \
+    bash -lc "rm -rf /tmp/ruby_parallel_noc_parallel_r${run} && mkdir -p /tmp/ruby_parallel_noc_parallel_r${run} && \
+      /workspace/build/Garnet_standalone/gem5.opt \
+        --outdir=/tmp/ruby_parallel_noc_parallel_r${run} \
+        /workspace/tests/gem5/ruby_parallel_noc/configs/ruby_garnet_equiv.py \
+        --parallel-noc-mode parallel \
+        --parallel-noc-workers 3 \
+        --network garnet \
+        --topology Mesh_XY \
+        --num-cpus 4 \
+        --num-dirs 4 \
+        --mesh-rows 2 \
+        --sim-cycles 2000 \
+        --synthetic uniform_random \
+        --injectionrate 0.02 \
+        --routing-algorithm 1" \
+    | tee "/tmp/ruby_parallel_noc_parallel_r${run}.log"
+done
 ```
 
 ## Current coverage
@@ -180,6 +314,11 @@ docker run --rm \
 - `test_serial_batched_baseline.py` proves `serial_batched` matches `off`.
 - `test_parallel_baseline.py` proves `parallel` reports the real partition and
   matches the workload-completion metric from the baseline.
+- `test_auto_partitioner_baseline.py` proves `parallel + topology_auto`
+  preserves the workload metric while reporting the deterministic auto
+  partitioner summary and worker-reduction note for the 2x2 baseline mesh.
+- `test_auto_partitioner_fallback.py` proves non-mesh `topology_auto`
+  requests fall back to deterministic `router_chunks` with an explicit note.
 - `test_network_accel_smoke.py` covers option parsing and coordinator surface.
 
 ## Manual benchmark flow

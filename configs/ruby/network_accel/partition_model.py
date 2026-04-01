@@ -263,6 +263,18 @@ def format_partition_summary_lines(summary):
         "PARALLEL_NOC_PARTITION_MAP "
         f"queues={format_partition_map(summary.queue_to_router_map)}",
     ]
+    if (
+        summary.requested_partitioner == "topology_auto"
+        and summary.strategy == "router_chunks"
+        and summary.auto_shape in {"mesh_blocks", "mesh_strips"}
+    ):
+        lines.append(
+            "PARALLEL_NOC_NOTE "
+            f"requested={summary.requested_partitioner} "
+            f"auto_shape={summary.auto_shape} "
+            "fallback=router_chunks "
+            "reason=non_mesh_topology"
+        )
     if summary.topology is not None:
         rows = (
             str(summary.topology.mesh_rows)
